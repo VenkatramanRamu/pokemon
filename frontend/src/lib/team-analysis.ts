@@ -6,7 +6,7 @@
 // Thick Fat mon takes half from Fire/Ice, etc. Type-based abilities only, we
 // can't model contact (Fluffy) or item/weather conditionals here.
 
-import { typeEffectiveness } from './damage-calc';
+import { typeEffectiveness, moveEffectiveness } from './damage-calc';
 import { capitalize } from './utils';
 
 export const ATTACKING_TYPES = [
@@ -101,7 +101,16 @@ export interface AnalysisMember {
     type1: string;
     type2: string | null;
     ability: string | null; // display name
-    moves: Array<{ displayName: string; type: string; power: number | null }>;
+    moves: Array<{ displayName: string; type: string; power: number | null; damageClass?: string }>;
+}
+
+// A move contributes offensive coverage unless it's a status move. Variable-power
+// damaging moves (Low Kick, Grass Knot, Gyro Ball, ...) carry null power but still
+// deal damage, so we key off damageClass, not power. When damageClass is absent
+// (e.g. synthesized STAB pseudo-moves), treat it as damaging.
+export function isDamagingMove(mv: { power: number | null; damageClass?: string }): boolean {
+    if (mv.damageClass) return mv.damageClass !== 'status';
+    return mv.power !== null;
 }
 
 export interface DefensiveCell { member: AnalysisMember; mult: number; }
@@ -129,9 +138,10 @@ export function analyzeTeam(members: AnalysisMember[], typeChart: TypeChart): Te
         const hits: OffensiveHit[] = [];
         for (const m of members) {
             for (const mv of m.moves) {
-                if (mv.power === null) continue;
+                if (!isDamagingMove(mv)) continue;
                 const mvType = capitalize(mv.type);
-                const mult = typeChart[mvType]?.[def] ?? 1;
+                // Name-aware so move specials count (e.g. Freeze-Dry hits Water 2x).
+                const mult = moveEffectiveness(mv.displayName, mv.type, def, null, typeChart);
                 if (mult > 1) hits.push({ member: m, moveDisplayName: mv.displayName, moveType: mvType, mult });
             }
         }
@@ -192,8 +202,8 @@ export function buildMetaMatrix(
         let viaMove: string | null = null;
         for (const m of members) {
             for (const mv of m.moves) {
-                if (mv.power === null) continue;
-                const mult = typeEffectiveness(mv.type, mon.type1, mon.type2, typeChart);
+                if (!isDamagingMove(mv)) continue;
+                const mult = moveEffectiveness(mv.displayName, mv.type, mon.type1, mon.type2, typeChart);
                 if (mult > bestMult) { bestMult = mult; viaMember = m.displayName; viaMove = mv.displayName; }
             }
         }

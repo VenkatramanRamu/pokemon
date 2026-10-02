@@ -42,7 +42,7 @@ const SPOT_CHECKS: SpotCheck[] = [
 
     // ---- Banned mega stones (specific notes) ----
     { name: 'mewtwonite-x',     expectIsHoldable: true,  expectPcAvailable: false, expectCategory: 'mega-stones', expectNotesContains: 'Mega Mewtwo X is banned' },
-    { name: 'salamencite',      expectIsHoldable: true,  expectPcAvailable: false, expectCategory: 'mega-stones', expectNotesContains: 'Mega Salamence is banned' },
+    { name: 'salamencite',      expectIsHoldable: true,  expectPcAvailable: true,  expectCategory: 'mega-stones' },
     { name: 'diancite',         expectIsHoldable: true,  expectPcAvailable: false, expectCategory: 'mega-stones', expectNotesContains: 'Mega Diancie is banned' },
 
     // ---- PC-legal: gen 6/7 mega stones still in PC ----
@@ -89,8 +89,8 @@ const SPOT_CHECKS: SpotCheck[] = [
     { name: 'poke-ball',        expectIsHoldable: false, expectCategory: 'standard-balls' },
 ];
 
-const EXPECTED_PC_HOLDABLE = 148; // is_holdable=1 AND pc_available=1; matches sheet whitelist (117 + 31 Reg M-B)
-const EXPECTED_PC_ONLY = 34; // synthetic mega stones (id>=100000): 23 Z-A + 11 Reg M-B
+const EXPECTED_PC_HOLDABLE = 154; // is_holdable=1 AND pc_available=1; sheet whitelist (117 + 31 Reg M-B + 6 Reg M-C)
+const EXPECTED_PC_ONLY = 39; // synthetic mega stones (id>=100000): 23 Z-A + 11 Reg M-B + 5 Reg M-C
 
 async function main() {
     const config = loadConfig();
@@ -116,7 +116,7 @@ async function main() {
     const zCrystals = zCrystalRows[0].count;
     const pcOnly = pcOnlyRows[0].count;
 
-    console.log(`items total:                      ${total}  (expected 2209 = 2175 PokeAPI + 34 PC-only)`);
+    console.log(`items total:                      ${total}  (expected 2214 = 2175 PokeAPI + 39 PC-only)`);
     console.log(`is_holdable=1:                    ${holdable}`);
     console.log(`PC-legal held items (h=1, pc=1):  ${pcHoldable}  (expected ${EXPECTED_PC_HOLDABLE} = sheet whitelist)`);
     console.log(`pc_available=0:                   ${unavailable}`);

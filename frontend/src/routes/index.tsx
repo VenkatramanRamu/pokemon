@@ -125,10 +125,10 @@ function Home() {
                         description="Standalone v2: STAB, types, weather, screens, items, abilities, berries."
                     />
                     <ToolTile
-                        to="/lead-helper"
+                        to="/prep"
                         icon={Target}
-                        title="Lead helper"
-                        description="Rank every (bring 4, lead 2) combination against an opposing 6."
+                        title="Matchup prep"
+                        description="Opening plan, lead ranking, and opponent scout in one place."
                     />
                     <ToolTile
                         to="/matchups"

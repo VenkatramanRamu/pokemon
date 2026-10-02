@@ -44,6 +44,8 @@ const PC_HELD_ITEM_SLUGS = new Set<string>([
     'raichunite-x', 'raichunite-y', 'staraptite', 'scolipite', 'scraftinite',
     'eelektrossite', 'pyroarite', 'malamarite', 'barbaracite', 'dragalgite',
     'falinksite',
+    // Regulation M-C stones (6): Salamencite (returning Gen 6 stone, now legal) + 5 new megas.
+    'salamencite', 'baxcalibrite', 'golisopite', 'absolite-z', 'garchompite-z', 'lucarionite-z',
     // Defense - resist berries (18)
     'roseli-berry', 'chilan-berry', 'babiri-berry', 'haban-berry', 'charti-berry',
     'tanga-berry', 'payapa-berry', 'kebia-berry', 'chople-berry', 'rindo-berry',
@@ -111,6 +113,13 @@ const PC_ITEM_ADDITIONS: PcOnlyItem[] = [
     { id: 100032, name: 'barbaracite',    displayName: 'Barbaracite',    category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Barbaracle to Mega Evolve.',  effect: 'A held item that allows Barbaracle to Mega Evolve.' },
     { id: 100033, name: 'dragalgite',     displayName: 'Dragalgite',     category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Dragalge to Mega Evolve.',    effect: 'A held item that allows Dragalge to Mega Evolve.' },
     { id: 100034, name: 'falinksite',     displayName: 'Falinksite',     category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Falinks to Mega Evolve.',     effect: 'A held item that allows Falinks to Mega Evolve.' },
+    // Regulation M-C new mega stones (5). Salamencite already exists via PokeAPI
+    // (it was banned in M-B; whitelisted below for M-C).
+    { id: 100035, name: 'baxcalibrite',   displayName: 'Baxcalibrite',   category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Baxcalibur to Mega Evolve.',  effect: 'A held item that allows Baxcalibur to Mega Evolve.' },
+    { id: 100036, name: 'golisopite',     displayName: 'Golisopite',     category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Golisopod to Mega Evolve.',   effect: 'A held item that allows Golisopod to Mega Evolve.' },
+    { id: 100037, name: 'absolite-z',     displayName: 'Absolite Z',     category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Absol to Mega Evolve into Mega Absol Z.',      effect: 'A held item that allows Absol to Mega Evolve into Mega Absol Z.' },
+    { id: 100038, name: 'garchompite-z',  displayName: 'Garchompite Z',  category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Garchomp to Mega Evolve into Mega Garchomp Z.', effect: 'A held item that allows Garchomp to Mega Evolve into Mega Garchomp Z.' },
+    { id: 100039, name: 'lucarionite-z',  displayName: 'Lucarionite Z',  category: 'mega-stones', flingPower: 80, shortEffect: 'Allows Lucario to Mega Evolve into Mega Lucario Z.',   effect: 'A held item that allows Lucario to Mega Evolve into Mega Lucario Z.' },
 ];
 
 // =============================================================================
@@ -142,7 +151,7 @@ const SPECIFIC_NOTES: SpecificNote[] = [
     { name: 'latiosite',        pcNotes: 'Not in PC. Mega Latios is banned in Pokemon Champions.' },
     { name: 'mewtwonite-x',     pcNotes: 'Not in PC. Mega Mewtwo X is banned in Pokemon Champions.' },
     { name: 'mewtwonite-y',     pcNotes: 'Not in PC. Mega Mewtwo Y is banned in Pokemon Champions.' },
-    { name: 'salamencite',      pcNotes: 'Not in PC. Mega Salamence is banned in Pokemon Champions.' },
+    // Salamencite became legal in Regulation M-C (2026-09-08) and is now whitelisted above.
 ];
 
 const GENERIC_UNAVAILABLE_NOTE = 'Not in PC. Not present in the Champions Database held items list.';

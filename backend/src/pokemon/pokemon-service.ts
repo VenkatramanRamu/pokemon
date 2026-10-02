@@ -42,6 +42,7 @@ export interface PokemonListItem {
     regionVariant: string | null;
     pcAvailable: boolean;
     abilities: PokemonListAbility[];
+    weight: number | null;
 }
 
 export interface PokemonAbilityEntry {
@@ -196,6 +197,7 @@ export class PokemonService {
                 baseSpd: PokemonTable.baseSpd,
                 baseSpe: PokemonTable.baseSpe,
                 bst: PokemonTable.bst,
+                weight: PokemonTable.weight,
             })
             .from(PokemonTable)
             .$dynamic();
@@ -248,6 +250,7 @@ export class PokemonService {
             regionVariant: r.regionVariant,
             pcAvailable: r.pcAvailable === 1,
             abilities: abilitiesByPokemon.get(r.id) ?? [],
+            weight: r.weight ?? null,
         }));
     }
 
@@ -274,6 +277,7 @@ export class PokemonService {
                 baseSpd: PokemonTable.baseSpd,
                 baseSpe: PokemonTable.baseSpe,
                 bst: PokemonTable.bst,
+                weight: PokemonTable.weight,
             })
             .from(PokemonTable)
             .where(eq(PokemonTable.id, id))
@@ -441,6 +445,7 @@ export class PokemonService {
             regionVariant: base.regionVariant,
             pcAvailable: base.pcAvailable === 1,
             pcNotes: base.pcNotes,
+            weight: base.weight ?? null,
             abilities: abilityRows.map((a) => ({
                 id: a.id,
                 name: a.name,

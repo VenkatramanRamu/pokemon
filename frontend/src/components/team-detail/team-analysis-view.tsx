@@ -245,8 +245,11 @@ function FlexibleTypingNote({ members, typeChart }: { members: AnalysisMember[];
             </div>
             <div className="flex flex-col gap-4">
                 {retypers.map((m) => {
+                    // Every move retypes a Protean/Libero user, not just damaging ones:
+                    // Protect (Normal status) and variable-power moves like Low Kick
+                    // (stored power null) still commit the type on use. Count them all.
                     const moveTypes = Array.from(new Set(
-                        m.moves.filter((mv) => mv.power !== null).map((mv) => capitalize(mv.type)),
+                        m.moves.map((mv) => capitalize(mv.type)),
                     ));
                     return (
                         <div key={m.id} className="flex flex-col gap-1.5">
@@ -260,7 +263,7 @@ function FlexibleTypingNote({ members, typeChart }: { members: AnalysisMember[];
                                 </span>
                             </div>
                             {moveTypes.length === 0 ? (
-                                <span className="text-xs italic text-muted-foreground">No damaging moves picked yet.</span>
+                                <span className="text-xs italic text-muted-foreground">No moves picked yet.</span>
                             ) : (
                                 <ul className="flex flex-col gap-1 pl-1">
                                     {moveTypes.map((t) => {

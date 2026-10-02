@@ -1,13 +1,38 @@
-// Pure damage-calc module. Implements the Gen 5+ damage formula with v1
-// modifiers: STAB, type effectiveness, critical hit, the 0.85-1.00 random
-// roll. Weather / screens / burn / item / ability modifiers will layer on
-// in a later slice.
+// Pure damage-calc module. Faithfully reimplements Pokemon Showdown's damage
+// pipeline (sim/battle-actions.ts getDamage/modifyDamage) so our numbers match
+// the reference calculator, using our own Champions data:
 //
-// Reference: Bulbapedia "Damage" article, Gen 5+ formula. Pokemon Champions
-// follows the same shape, every step is floor()'d, matching the PC stat
-// formula we already reverse-engineered for the team detail page.
+//   base  = trunc(trunc(trunc(2*L/5+2) * power * atk) / def) / 50 + 2
+//   spread  -> modify(0.75)
+//   weather -> modify(1.5 / 0.5)
+//   crit    -> trunc(x * 1.5)
+//   random  -> trunc(trunc(x * (85..100)) / 100)   (16-roll spread)
+//   STAB    -> modify(1.5 / 2)
+//   type    -> trunc(x * 2) / trunc(x / 2) per effectiveness step
+//   burn    -> modify(0.5)
+//   final   -> chainModify(screens, items, abilities, berries, terrain, ...)
+//
+// "modify" is Showdown's 4096-denominator pokeRound: trunc((trunc(v*mod)+2048)/4096).
+// Base-power and final-damage modifiers are chained (accumulated in 4096 space,
+// applied once) exactly as Showdown does, so per-step truncation matches.
 
 import { capitalize } from './utils';
+
+// ---- Showdown fixed-point modifier helpers (4096 denominator) ----
+const CHAIN = 4096;
+const trunc = Math.trunc;
+// A float multiplier as a 4096-denominator modifier, e.g. 1.5 -> 6144.
+const toMod = (mult: number): number => trunc(mult * CHAIN);
+// Combine two modifiers (Showdown chainModify): pokeRound of their product.
+const chainMod = (a: number, b: number): number => trunc((a * b + 2048) / CHAIN);
+// Apply a 4096-modifier to a value (Showdown modify / pokeRound).
+const applyMod = (value: number, mod: number): number => trunc((trunc(value * mod) + 2048) / CHAIN);
+// Fold a list of float multipliers into one chained modifier (4096 = identity).
+function chainAll(mults: number[] | undefined): number {
+    let m = CHAIN;
+    if (mults) for (const x of mults) { if (x !== 1) m = chainMod(m, toMod(x)); }
+    return m;
+}
 
 export interface DamageInput {
     level: number;
@@ -29,6 +54,13 @@ export interface DamageInput {
     multiscale?: boolean;     // ×0.5 (defender at full HP)
     filter?: boolean;         // ×0.75, only if typeMultiplier > 1
     berryResist?: boolean;    // ×0.5, caller pre-decides whether the berry triggers
+
+    // Phase-correct modifier lists (Showdown chains these). basePowerMods hit the
+    // move's power before the formula (Technician, Tough Claws, type-boost items,
+    // Muscle/Wise Band); finalMods hit at the ModifyDamage step (Life Orb, Expert
+    // Belt, Thick Fat, Ice Scales, terrain, …). Each is a plain float multiplier.
+    basePowerMods?: number[];
+    finalMods?: number[];
 }
 
 // Reference table of the 18 type-resist berries. Keyed by canonical type name.
@@ -169,58 +201,49 @@ export function computeDamage(input: DamageInput, defenderMaxHp: number): Damage
         };
     }
 
-    // Base damage. The 2 + ((2*L/5 + 2) * P * A / D) / 50 expression with
-    // floor at the end matches the canonical formula.
-    const base = Math.floor(
-        ((2 * input.level / 5 + 2) * input.movePower * input.attackingStat / input.defendingStat) / 50 + 2,
-    );
+    // Base power after base-power modifiers (Technician, Tough Claws, type items).
+    const power = applyMod(input.movePower, chainAll(input.basePowerMods));
 
-    // Modifiers applied in canonical Gen 5+ order:
-    //   targets → weather → crit → (random) → STAB → type → burn → other
-    // The random roll is applied last via ROLL_PERCENTS so we can return the
-    // full 16-roll spread; everything else floors at each step.
-    let dmg = base;
+    // Base damage: trunc(trunc(trunc(2*L/5+2) * power * atk) / def) / 50 + 2.
+    // Matches Showdown's getDamage (the final /50 is not truncated before +2).
+    const levelFactor = trunc(2 * input.level / 5 + 2);
+    let base = trunc(trunc(levelFactor * power * input.attackingStat) / input.defendingStat) / 50;
+    base += 2;
 
-    if (input.isSpread) {
-        dmg = Math.floor(dmg * 0.75);
-    }
-    if (input.weatherMod !== undefined && input.weatherMod !== 1.0) {
-        dmg = Math.floor(dmg * input.weatherMod);
-    }
-    if (input.isCritical) {
-        dmg = Math.floor(dmg * 1.5);
-    }
-    // STAB, Adaptability bumps it to ×2.
-    if (input.isStab) {
-        const stabFactor = input.adaptability ? 2.0 : 1.5;
-        dmg = Math.floor(dmg * stabFactor);
-    }
-    dmg = Math.floor(dmg * input.typeMultiplier);
-    if (input.isBurned && input.isPhysical !== false) {
-        dmg = Math.floor(dmg * 0.5);
-    }
+    // Spread → weather → crit are applied once (shared across all 16 rolls).
+    if (input.isSpread) base = applyMod(base, toMod(0.75));
+    if (input.weatherMod !== undefined && input.weatherMod !== 1.0) base = applyMod(base, toMod(input.weatherMod));
+    if (input.isCritical) base = trunc(base * 1.5);
 
-    // "Other" bucket, screens, items, abilities, berries. Order within the
-    // bucket only matters at the integer-boundary; we apply in the order
-    // most calcs document (screens first, items, then defender-side
-    // dampeners) so cross-tool diffs are minimal.
-    if (input.screenMod !== undefined && input.screenMod !== 1.0) {
-        dmg = Math.floor(dmg * input.screenMod);
-    }
-    if (input.itemMod !== undefined && input.itemMod !== 1.0) {
-        dmg = Math.floor(dmg * input.itemMod);
-    }
-    if (input.multiscale) {
-        dmg = Math.floor(dmg * 0.5);
-    }
-    if (input.filter && input.typeMultiplier > 1) {
-        dmg = Math.floor(dmg * 0.75);
-    }
-    if (input.berryResist) {
-        dmg = Math.floor(dmg * 0.5);
-    }
+    // Effectiveness as successive doublings/halvings (Showdown applies type per
+    // step with truncation, not as one float multiply).
+    const stabMod = input.isStab ? toMod(input.adaptability ? 2.0 : 1.5) : CHAIN;
+    let typeSteps = 0;
+    if (input.typeMultiplier > 1) typeSteps = Math.round(Math.log2(input.typeMultiplier));      // +1 per doubling
+    else if (input.typeMultiplier < 1) typeSteps = -Math.round(Math.log2(1 / input.typeMultiplier)); // -1 per halving
+    const burn = input.isBurned && input.isPhysical !== false;
 
-    const rolls = ROLL_PERCENTS.map((r) => Math.floor(dmg * r / 100));
+    // Final-damage bucket (chained): screens, items, Multiscale, Filter, berry,
+    // plus any caller-supplied finalMods (terrain, Thick Fat, Ice Scales, …).
+    let finalMod = CHAIN;
+    if (input.screenMod !== undefined && input.screenMod !== 1.0) finalMod = chainMod(finalMod, toMod(input.screenMod));
+    if (input.itemMod !== undefined && input.itemMod !== 1.0) finalMod = chainMod(finalMod, toMod(input.itemMod));
+    if (input.multiscale) finalMod = chainMod(finalMod, toMod(0.5));
+    if (input.filter && input.typeMultiplier > 1) finalMod = chainMod(finalMod, toMod(0.75));
+    if (input.berryResist) finalMod = chainMod(finalMod, toMod(0.5));
+    if (input.finalMods) for (const x of input.finalMods) { if (x !== 1) finalMod = chainMod(finalMod, toMod(x)); }
+
+    // The 85..100 random roll is applied here (Showdown's position), then STAB,
+    // type, burn and the final bucket run per roll so truncation matches exactly.
+    const rolls = ROLL_PERCENTS.map((r) => {
+        let d = trunc(trunc(base * r) / 100);
+        if (stabMod !== CHAIN) d = applyMod(d, stabMod);
+        for (let i = 0; i < typeSteps; i++) d = trunc(d * 2);
+        for (let i = 0; i > typeSteps; i--) d = trunc(d / 2);
+        if (burn) d = applyMod(d, toMod(0.5));
+        if (finalMod !== CHAIN) d = applyMod(d, finalMod);
+        return Math.max(1, d); // Gen 6+: damage is never less than 1 (immunity handled above)
+    });
     const min = rolls[0];
     const max = rolls[rolls.length - 1];
 
@@ -272,4 +295,28 @@ export function typeEffectiveness(
     const def2 = capitalize(defenderType2);
     const m2 = typeChart[attacker]?.[def2] ?? 1;
     return m1 * m2;
+}
+
+// Moves whose effectiveness overrides the pure type chart against specific defender
+// types. Freeze-Dry is Ice but hits Water for 2x (not 0.5). Keyed by normalized move
+// name -> { DefenderType: multiplier }. Extend for other specials as they come up.
+const MOVE_EFFECT_OVERRIDES: Record<string, Record<string, number>> = {
+    freezedry: { Water: 2 },
+};
+
+// Effectiveness of a SPECIFIC move (name-aware), applying per-move overrides on top
+// of the type chart. Use this anywhere a concrete move is evaluated (battle, coverage,
+// lead-helper, damage calc); use typeEffectiveness only for raw type-vs-type questions.
+export function moveEffectiveness(
+    moveName: string,
+    moveType: string,
+    defenderType1: string,
+    defenderType2: string | null,
+    typeChart: Record<string, Record<string, number>>,
+): number {
+    const overrides = MOVE_EFFECT_OVERRIDES[moveName.toLowerCase().replace(/[^a-z0-9]/g, '')];
+    if (!overrides) return typeEffectiveness(moveType, defenderType1, defenderType2, typeChart);
+    const atk = capitalize(moveType);
+    const per = (dt: string): number => overrides[capitalize(dt)] ?? (typeChart[atk]?.[capitalize(dt)] ?? 1);
+    return per(defenderType1) * (defenderType2 ? per(defenderType2) : 1);
 }

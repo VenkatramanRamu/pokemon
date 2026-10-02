@@ -1,29 +1,34 @@
 import type { ImgHTMLAttributes } from 'react';
 import { spriteUrl } from '@/modules/api/endpoints';
+import { useSpriteStyle, type SpriteVariant } from '@/lib/sprite-pref';
 import { cn } from '@/lib/utils';
-
-type SpriteVariant = 'default' | 'official';
 
 interface Props extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'onError' | 'id'> {
     id: number;
-    variant?: SpriteVariant;
+    variant?: SpriteVariant; // explicit override; otherwise follows the global sprite-style preference
 }
 
-export function Sprite({ id, variant = 'default', alt = '', className, ...rest }: Props) {
+export function Sprite({ id, variant, alt = '', className, ...rest }: Props) {
+    const pref = useSpriteStyle();
+    const chosen = variant ?? pref;
+    // Fallback chain: chosen -> home -> official -> default. HOME is bundled for
+    // every species, so it covers the ~40 mega/Z forms that lack a pixel sprite.
+    const chain: SpriteVariant[] = [...new Set<SpriteVariant>([chosen, 'home', 'official', 'default'])];
+
     return (
         <img
             {...rest}
-            src={spriteUrl(id, variant)}
+            key={chosen} // reset the fallback walk when the preference changes
+            src={spriteUrl(id, chain[0])}
             alt={alt}
+            data-step="0"
             className={cn('object-contain', className)}
             onError={(e) => {
                 const img = e.currentTarget as HTMLImageElement;
-                // Many mega forms (Z-A / Regulation M-B) have no pixel "default" sprite
-                // upstream but do have official artwork, fall back to it before hiding.
-                const official = spriteUrl(id, 'official');
-                if (variant !== 'official' && !img.dataset.fellBack) {
-                    img.dataset.fellBack = '1';
-                    img.src = official;
+                const step = Number(img.dataset.step ?? '0') + 1;
+                if (step < chain.length) {
+                    img.dataset.step = String(step);
+                    img.src = spriteUrl(id, chain[step]);
                     return;
                 }
                 img.style.visibility = 'hidden';

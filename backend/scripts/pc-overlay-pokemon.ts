@@ -116,6 +116,20 @@ const PC_POKEMON_SLUGS: ReadonlySet<string> = new Set([
     'metagross-mega', 'raichu-mega-x', 'raichu-mega-y', 'staraptor-mega',
     'scolipede-mega', 'scrafty-mega', 'eelektross-mega', 'pyroar-mega',
     'malamar-mega', 'barbaracle-mega', 'dragalge-mega', 'falinks-mega',
+    // --- Regulation M-C additions (2026-09-08 -> 2026-12-01) ---
+    // 24 newly-available species (M-C is additive; all M-B stays legal) + 6 new
+    // Mega forms (3 standard: Salamence/Golisopod/Baxcalibur, 3 Z-megas).
+    // Source: pokemon.com M-C announcement + pokebase.app roster. (pawmot already legal.)
+    'rillaboom', 'cinderace', 'inteleon', 'salamence',
+    'golisopod', 'baxcalibur', 'wigglytuff', 'persian',
+    'persian-alola', 'mr-mime', 'swalot', 'gogoat',
+    'thievul', 'toxtricity-amped', 'toxtricity-low-key', 'grapploct',
+    'perrserker', 'pincurchin', 'indeedee-male', 'indeedee-female',
+    'arboliva', 'squawkabilly-green-plumage', 'mabosstiff', 'farfetchd',
+    'sirfetchd',
+    // M-C Mega forms.
+    'salamence-mega', 'golisopod-mega', 'baxcalibur-mega',
+    'absol-mega-z', 'garchomp-mega-z', 'lucario-mega-z',
 ]);
 
 async function main() {
@@ -132,6 +146,10 @@ async function main() {
     // Reset to mainline state so removed entries clear correctly on re-run.
     await db.execute(sql`UPDATE pokemon SET pc_available = 1, pc_notes = NULL`);
     await db.execute(sql`UPDATE pokemon_moves SET pc_available = 1, pc_notes = NULL`);
+
+    // Regulation M-C Z-mega forms use a `-mega-z` slug, which sync:pokemon's
+    // `-mega` detection misses, so flag them as megas here (idempotent).
+    await db.execute(sql`UPDATE pokemon SET is_mega = 1 WHERE name IN ('absol-mega-z', 'garchomp-mega-z', 'lucario-mega-z')`);
 
     // Build name -> id lookups.
     const [pokemonRows] = await conn.query<mysql.RowDataPacket[]>('SELECT id, name FROM pokemon');

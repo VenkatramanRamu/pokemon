@@ -45,6 +45,9 @@ function TeamsListPage() {
                         className="w-[260px] pl-8"
                     />
                 </form>
+                <Button asChild size="sm" variant="outline">
+                    <Link to="/teams/new/import">Import paste</Link>
+                </Button>
                 <Button asChild size="sm">
                     <Link to="/teams/new">+ New team</Link>
                 </Button>

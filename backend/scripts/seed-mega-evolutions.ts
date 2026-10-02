@@ -111,6 +111,16 @@ const MAPPINGS: MegaMapping[] = [
     { stone: 'barbaracite',     base: 'barbaracle',   mega: 'barbaracle-mega' },
     { stone: 'dragalgite',      base: 'dragalge',     mega: 'dragalge-mega' },
     { stone: 'falinksite',      base: 'falinks',      mega: 'falinks-mega' },
+    // Regulation M-C new megas (5, 2026-09-08). Salamence->salamence-mega already
+    // mapped above (Gen 6 stone). Z-megas are a SECOND mega from an existing base
+    // via a distinct "-z" stone (unique key is base+stone, so no conflict with the
+    // base mega). Mega form rows (types/stats) were pre-seeded; stones added in
+    // pc-overlay-items.ts.
+    { stone: 'baxcalibrite',    base: 'baxcalibur',   mega: 'baxcalibur-mega' },
+    { stone: 'golisopite',      base: 'golisopod',    mega: 'golisopod-mega' },
+    { stone: 'absolite-z',      base: 'absol',        mega: 'absol-mega-z',   notes: 'Z Mega Evolution (second mega form).' },
+    { stone: 'garchompite-z',   base: 'garchomp',     mega: 'garchomp-mega-z', notes: 'Z Mega Evolution (second mega form).' },
+    { stone: 'lucarionite-z',   base: 'lucario',      mega: 'lucario-mega-z',  notes: 'Z Mega Evolution (second mega form).' },
 ];
 
 async function main() {

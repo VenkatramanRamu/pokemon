@@ -181,8 +181,14 @@ function ImportPastePage() {
                             <ul className="list-disc pl-4">{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
                         </div>
                     )}
-                    {detailsLoading && <p className="text-sm text-muted-foreground">Resolving abilities &amp; moves…</p>}
-
+                    {detailsLoading ? (
+                        // Wait for the per-species ability/move detail queries before
+                        // mounting the form. TeamForm is keyed on parsedGen and only
+                        // reads initialMembers on mount, so mounting mid-fetch captured
+                        // members without their moves (the "click Parse twice" bug).
+                        <p className="text-sm text-muted-foreground">Resolving abilities &amp; moves…</p>
+                    ) : (
+                    <>
                     <p className="text-sm text-muted-foreground">
                         Parsed {parsed.length} Pokémon. Review below, name a folder, and save.
                     </p>
@@ -216,6 +222,8 @@ function ImportPastePage() {
                         canSave={folder.length > 0 && !folderError}
                         onSave={(markdown) => mutation.mutate({ sourceFolder: folder, markdown })}
                     />
+                    </>
+                    )}
                 </>
             )}
         </section>

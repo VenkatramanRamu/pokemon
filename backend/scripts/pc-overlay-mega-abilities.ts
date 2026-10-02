@@ -72,6 +72,16 @@ const MEGA_ABILITIES: { mega: string; ability: string }[] = [
     { mega: 'barbaracle-mega', ability: 'tough-claws' },
     { mega: 'dragalge-mega', ability: 'regenerator' },
     { mega: 'falinks-mega', ability: 'defiant' },
+    // Regulation M-C megas (2026-09-08). Z-mega abilities per the M-C reveal
+    // (Absol Z: Sharpness, Garchomp Z: Levitate, Lucario Z: Aura Break).
+    // Salamence-Mega keeps Aerilate from PokeAPI (not listed here).
+    // NOTE: Baxcalibur-Mega and Golisopod-Mega abilities are NOT officially
+    // revealed yet; provisionally set to their base ability. Update when confirmed.
+    { mega: 'baxcalibur-mega', ability: 'thermal-exchange' },
+    { mega: 'golisopod-mega', ability: 'emergency-exit' },
+    { mega: 'absol-mega-z', ability: 'sharpness' },
+    { mega: 'garchomp-mega-z', ability: 'levitate' },
+    { mega: 'lucario-mega-z', ability: 'aura-break' },
 ];
 
 async function main() {

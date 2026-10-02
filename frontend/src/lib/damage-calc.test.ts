@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    typeEffectiveness, computeDamage, defenderImmuneByAbility, isStabType, type DamageInput,
+    typeEffectiveness, moveEffectiveness, computeDamage, defenderImmuneByAbility, isStabType, type DamageInput,
 } from './damage-calc';
 
 const chart = {
@@ -23,6 +23,19 @@ describe('typeEffectiveness', () => {
         // a real input and is intentionally not supported).
         expect(typeEffectiveness('ice', 'dragon', 'ground', chart)).toBe(4);
         expect(typeEffectiveness('ice', 'Dragon', 'Ground', chart)).toBe(4);
+    });
+});
+
+describe('moveEffectiveness (per-move overrides)', () => {
+    const iceChart = { Ice: { Water: 0.5, Ground: 2, Dragon: 2, Grass: 2 } };
+    it('Freeze-Dry hits Water for 2x (overriding Ice 0.5)', () => {
+        expect(moveEffectiveness('Freeze-Dry', 'Ice', 'Water', null, iceChart)).toBe(2);
+    });
+    it('Freeze-Dry vs Water/Ground = 4x (Water override x Ground)', () => {
+        expect(moveEffectiveness('Freeze-Dry', 'Ice', 'Water', 'Ground', iceChart)).toBe(4);
+    });
+    it('a normal Ice move is still resisted by Water', () => {
+        expect(moveEffectiveness('Ice Beam', 'Ice', 'Water', null, iceChart)).toBe(0.5);
     });
 });
 
@@ -82,5 +95,37 @@ describe('computeDamage, invariants', () => {
     it('flags a guaranteed OHKO when even the min roll exceeds HP', () => {
         const r = computeDamage(dmg({ attackingStat: 300, movePower: 150, typeMultiplier: 2, isStab: true }), 60);
         expect(r.ohko).toBe('guaranteed');
+    });
+});
+
+// Exact-value checks against Pokemon Showdown's pipeline (hand-computed from
+// base = trunc(trunc(22*90*150)/100)/50 + 2 = 61.4, then per-roll trunc/modify).
+// These lock the pokeRound + modifier-order fidelity, not just monotonicity.
+describe('computeDamage, Showdown-exact rolls', () => {
+    it('neutral non-STAB physical: 90 BP, 150 Atk vs 100 Def, L50 -> 52..61', () => {
+        const r = computeDamage(dmg(), 300);
+        expect(r.min).toBe(52);
+        expect(r.max).toBe(61);
+    });
+    it('STAB ×1.5 applies as a 4096 pokeRound -> 78..92', () => {
+        const r = computeDamage(dmg({ isStab: true }), 300);
+        expect(r.min).toBe(78);
+        expect(r.max).toBe(92);
+    });
+    it('super-effective ×2 doubles each roll with truncation -> 104..122', () => {
+        const r = computeDamage(dmg({ typeMultiplier: 2 }), 300);
+        expect(r.min).toBe(104);
+        expect(r.max).toBe(122);
+    });
+    it('Life Orb as a final chained modifier (×1.3) -> 68..79', () => {
+        const r = computeDamage(dmg({ finalMods: [1.3] }), 300);
+        expect(r.min).toBe(68);
+        expect(r.max).toBe(79);
+    });
+    it('base-power modifier (Tough Claws ×1.3) raises power before the formula', () => {
+        // power 90 -> pokeRound(90,5324)=117; base = trunc(trunc(22*117*150)/100)/50+2 = 79.22
+        const r = computeDamage(dmg({ basePowerMods: [1.3] }), 300);
+        expect(r.max).toBe(79); // trunc(trunc(79.24*100)/100)
+        expect(r.min).toBe(67); // trunc(trunc(79.24*85)/100)
     });
 });

@@ -112,7 +112,7 @@ export function TeamForm({
                 ? m.moveIds
                     .map((id) => (id === null ? null : detail.moves.find((mv) => mv.id === id) ?? null))
                     .filter((mv): mv is NonNullable<typeof mv> => mv !== null)
-                    .map((mv) => ({ displayName: mv.displayName, type: mv.type, power: mv.power }))
+                    .map((mv) => ({ displayName: mv.displayName, type: mv.type, power: mv.power, damageClass: mv.damageClass }))
                 : [];
             out.push({
                 id: i + 1,

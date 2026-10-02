@@ -117,6 +117,7 @@ export interface TeamMemberDetail {
         isRegional: boolean;
         regionVariant: string | null;
         pcAvailable: boolean;
+        weight: number | null;
     };
     ability: {
         id: number;
@@ -624,6 +625,7 @@ export class TeamsService {
                 isRegional: PokemonTable.isRegional,
                 regionVariant: PokemonTable.regionVariant,
                 pokemonPcAvailable: PokemonTable.pcAvailable,
+                weight: PokemonTable.weight,
                 abilityId: TeamMembersTable.abilityId,
                 abilityName: AbilitiesTable.name,
                 abilityDisplayName: AbilitiesTable.displayName,
@@ -800,6 +802,7 @@ export class TeamsService {
                     isRegional: m.isRegional === 1,
                     regionVariant: m.regionVariant,
                     pcAvailable: m.pokemonPcAvailable === 1,
+                    weight: m.weight ?? null,
                 },
                 ability: {
                     id: m.abilityId,

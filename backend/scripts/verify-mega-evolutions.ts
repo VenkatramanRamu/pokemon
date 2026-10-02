@@ -8,8 +8,8 @@ interface SpotCheck {
     expectPcAvailable?: boolean; // derived from items.pc_available of the stone
 }
 
-const EXPECTED_TOTAL = 82; // 47 Gen 6/7 + 23 Z-A + 1 floette-eternal duplicate base + 11 Reg M-B
-const EXPECTED_PC_LEGAL = 76;  // 60 prior PC-legal + 16 Reg M-B (5 unbanned Gen 6 + 11 new)
+const EXPECTED_TOTAL = 87; // 47 Gen 6/7 + 23 Z-A + 1 floette-eternal duplicate base + 11 Reg M-B + 5 Reg M-C
+const EXPECTED_PC_LEGAL = 82;  // 76 prior PC-legal + 6 Reg M-C (Salamence unbanned + 5 new)
 
 // Bases that are intentionally non-default (base_pokemon.is_default=0). Sanity
 // check should not warn about these.

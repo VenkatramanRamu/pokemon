@@ -11,7 +11,7 @@ import {
 } from '@/modules/api/endpoints';
 import { errorMessage } from '@/modules/api/api-client';
 import { ErrorBanner } from '@/components/error-banner';
-import { LeadHelperForm } from '@/components/lead-helper/lead-helper-form';
+import { MatchupPrep } from '@/components/prep/matchup-prep';
 import { CoverageTab } from '@/components/team-detail/coverage-tab';
 import { MatchupsView } from '@/components/team-detail/matchups-view';
 import { MemberCard } from '@/components/team-detail/member-card';
@@ -258,7 +258,7 @@ function TeamDetailPage() {
                     <TabsTrigger value="calc">Calc</TabsTrigger>
                     <TabsTrigger value="coverage">Coverage</TabsTrigger>
                     <TabsTrigger value="speed">Speed</TabsTrigger>
-                    <TabsTrigger value="lead">Lead</TabsTrigger>
+                    <TabsTrigger value="lead">Prep</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="members" className="flex flex-col gap-4">
@@ -312,7 +312,7 @@ function TeamDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="lead" className="flex flex-col gap-4">
-                    <LeadHelperForm team={data} />
+                    <MatchupPrep fixedTeam={data} />
                 </TabsContent>
 
                 <TabsContent value="matchups">

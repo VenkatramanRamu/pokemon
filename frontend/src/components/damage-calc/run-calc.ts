@@ -7,7 +7,7 @@
 import {
     computeDamage,
     isStabType,
-    typeEffectiveness,
+    moveEffectiveness,
 } from '@/lib/damage-calc';
 import type {
     PokemonMoveEntry,
@@ -39,7 +39,7 @@ export function dedupeDamagingMoves(moves: PokemonMoveEntry[]): PokemonMoveEntry
 // runCalc only reads type/power/damageClass, so accept any move-like shape. This
 // lets both PokemonMoveEntry (/calc) and TeamMoveEntry (team-calc tab) be passed, 
 // TeamMoveEntry omits learnMethod/levelLearnedAt, which the calc never touches.
-export type CalcMove = Pick<PokemonMoveEntry, 'type' | 'power' | 'damageClass'>;
+export type CalcMove = Pick<PokemonMoveEntry, 'type' | 'power' | 'damageClass' | 'displayName'>;
 
 export interface RunCalcInput {
     attackerType1: string;
@@ -71,7 +71,7 @@ export function runCalc(p: RunCalcInput): ResultCardCalc | null {
 
     const isPhysical = p.move.damageClass === 'physical';
     const isStab = isStabType(p.move.type, p.attackerType1, p.attackerType2, p.attackerAbility);
-    const typeMult = typeEffectiveness(p.move.type, p.defenderType1, p.defenderType2, p.typeChart);
+    const typeMult = moveEffectiveness(p.move.displayName, p.move.type, p.defenderType1, p.defenderType2, p.typeChart);
 
     const damageInput = applyModifiers(
         {

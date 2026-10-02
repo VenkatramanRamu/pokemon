@@ -3,6 +3,7 @@ import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Backdrop } from '@/components/backdrop/backdrop';
 import { BackdropProvider } from '@/components/backdrop/backdrop-context';
 import { BackdropPicker } from '@/components/backdrop/backdrop-picker';
+import { SpriteStylePicker } from '@/components/sprite-style-picker';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 function App() {
@@ -46,10 +47,10 @@ function App() {
                             Calc
                         </Link>
                         <Link
-                            to="/lead-helper"
+                            to="/prep"
                             className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
                         >
-                            Lead helper
+                            Prep
                         </Link>
                         <Link
                             to="/speed-tiers"
@@ -64,12 +65,25 @@ function App() {
                             Analyzer
                         </Link>
                         <Link
+                            to="/scan"
+                            className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
+                        >
+                            Scan
+                        </Link>
+                        <Link
+                            to="/battle"
+                            className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
+                        >
+                            Battle
+                        </Link>
+                        <Link
                             to="/matchups"
                             className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
                         >
                             Matchups
                         </Link>
                     </nav>
+                    <SpriteStylePicker />
                     <BackdropPicker />
                 </div>
             </header>

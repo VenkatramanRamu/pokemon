@@ -13,6 +13,6 @@ export function toAnalysisMembers(team: TeamDetail): AnalysisMember[] {
         type1: m.pokemon.type1,
         type2: m.pokemon.type2,
         ability: m.ability.displayName,
-        moves: m.moves.map((mv) => ({ displayName: mv.displayName, type: mv.type, power: mv.power })),
+        moves: m.moves.map((mv) => ({ displayName: mv.displayName, type: mv.type, power: mv.power, damageClass: mv.damageClass })),
     }));
 }

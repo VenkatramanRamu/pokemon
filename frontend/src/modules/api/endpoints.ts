@@ -2,11 +2,12 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './api-client';
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
-export type SpriteVariant = 'default' | 'official';
+import type { SpriteVariant } from '@/lib/sprite-pref';
+export type { SpriteVariant };
 
+const SPRITE_SUBDIR: Record<SpriteVariant, string> = { default: '', official: 'official/', home: 'home/' };
 export function spriteUrl(id: number, variant: SpriteVariant = 'default'): string {
-    const sub = variant === 'official' ? 'official/' : '';
-    return `${baseUrl}/sprites/pokemon/${sub}${id}.png`;
+    return `${baseUrl}/sprites/pokemon/${SPRITE_SUBDIR[variant]}${id}.png`;
 }
 
 export interface TypeListItem {
@@ -46,6 +47,7 @@ export interface PokemonListItem {
     regionVariant: string | null;
     pcAvailable: boolean;
     abilities: PokemonListAbility[];
+    weight: number | null;
 }
 
 export interface PokemonAbilityEntry {
@@ -237,6 +239,7 @@ export interface TeamMemberDetail {
         isRegional: boolean;
         regionVariant: string | null;
         pcAvailable: boolean;
+        weight: number | null;
     };
     ability: {
         id: number;

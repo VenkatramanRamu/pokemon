@@ -15,8 +15,10 @@
 
 import {
     defaultStat,
+    defaultHp,
     typeEffectiveness,
 } from '@/lib/damage-calc';
+import { bestKo, koScore, type KoAttacker, type KoDefender, type KoResult } from '@/lib/ko-calc';
 import type {
     PokemonListItem,
     TeamMemberDetail,
@@ -107,39 +109,41 @@ function scoreCombination(
     const notes: string[] = [];
     const opponentNames = new Set(opponents.map((o) => o.displayName));
 
-    // Offensive: best move-type effectiveness any of your bring members has
-    // against each opponent. Uses actual moves so a Greninja's Low Kick gets
-    // credit for hitting Tyranitar 4×, not just its STAB types.
+    // Offensive: real KO pressure. For each opponent, the hardest KO any bring
+    // member's move lands via Showdown damage math (base power, STAB, your
+    // items/abilities/EV-based stats vs the opponent's base-stat bulk). The
+    // opponent's item/ability are unknown at preview, so left neutral. Scored
+    // koScore-1 per opponent so OHKO ≈ +3, 2HKO ≈ +1, chip ≈ 0, nothing ≈ -1 —
+    // a band comparable to the defensive/speed terms.
     let offensive = 0;
-    const offensiveBest: Array<{ opp: string; mult: number; via: string | null }> = [];
+    const offensiveBest: Array<{ opp: string; ko: KoResult | null; via: string | null }> = [];
     for (const opp of opponents) {
-        let best = 1;
-        let via: string | null = null;
-        let viaMember: string | null = null;
+        const defender: KoDefender = {
+            type1: opp.type1, type2: opp.type2,
+            hp: defaultHp(opp.stats.hp), def: defaultStat(opp.stats.def), spd: defaultStat(opp.stats.spd),
+            ability: null, item: null,
+        };
+        let best: { ko: KoResult; via: string } | null = null;
         for (const m of bring) {
-            for (const move of m.moves) {
-                if (move.power === null) continue;
-                const eff = typeEffectiveness(move.type, opp.type1, opp.type2, typeChart);
-                if (eff > best) {
-                    best = eff;
-                    via = move.displayName;
-                    viaMember = m.pokemon.displayName;
-                }
+            const attacker: KoAttacker = {
+                type1: m.pokemon.type1, type2: m.pokemon.type2,
+                atk: m.finalStats.atk, spa: m.finalStats.spa,
+                ability: m.ability.displayName, item: m.item?.displayName ?? null,
+            };
+            const b = bestKo(attacker, defender, m.moves.map((mv) => ({
+                displayName: mv.displayName, type: mv.type, power: mv.power, damageClass: mv.damageClass,
+            })), typeChart);
+            if (b && (!best || koScore(b.ko) > koScore(best.ko))) {
+                best = { ko: b.ko, via: `${b.move.displayName} (${m.pokemon.displayName})` };
             }
         }
-        offensive += effScore(best);
-        offensiveBest.push({
-            opp: opp.displayName,
-            mult: best,
-            via: via && viaMember ? `${via} (${viaMember})` : null,
-        });
+        offensive += (best ? koScore(best.ko) : 0) - 1;
+        offensiveBest.push({ opp: opp.displayName, ko: best?.ko ?? null, via: best?.via ?? null });
     }
-    const seHits = offensiveBest.filter((e) => e.mult >= 2).length;
-    if (seHits >= 4) notes.push(`Strong offensive: ${seHits}/${opponents.length} opponents hit SE`);
-    if (offensiveBest.some((e) => e.mult >= 4)) {
-        const opp4x = offensiveBest.find((e) => e.mult >= 4);
-        if (opp4x?.via) notes.push(`4× answer for ${opp4x.opp}: ${opp4x.via}`);
-    }
+    const koHits = offensiveBest.filter((e) => e.ko && (e.ko.ohko !== 'no' || e.ko.thko !== 'no')).length;
+    if (koHits >= 4) notes.push(`Strong offense: KO or 2HKO on ${koHits}/${opponents.length} opponents`);
+    const ohkoAns = offensiveBest.find((e) => e.ko && e.ko.ohko === 'guaranteed' && e.via);
+    if (ohkoAns?.via) notes.push(`OHKOs ${ohkoAns.opp}: ${ohkoAns.via}`);
 
     // Defensive: opponents' best STAB type vs each of your bring members.
     // We only have their declared types (no moves), so STAB is the closest

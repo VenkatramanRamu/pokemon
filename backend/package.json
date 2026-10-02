@@ -34,6 +34,7 @@
     "verify:items": "tsx scripts/verify-items.ts",
     "sync:pokemon": "tsx scripts/sync-pokemon.ts",
     "pc-overlay:pokemon": "tsx scripts/pc-overlay-pokemon.ts",
+    "repair:learnsets": "tsx scripts/repair-learnsets.ts",
     "seed:pokemon": "npm run sync:pokemon && npm run pc-overlay:pokemon",
     "verify:pokemon": "tsx scripts/verify-pokemon.ts",
     "sync:evolution-stages": "tsx scripts/sync-evolution-stages.ts",

@@ -67,9 +67,27 @@ describe('analyzeTeam', () => {
         expect(a.offensive['Grass'].length).toBe(1);   // Fire hits Grass SE
         expect(a.offensiveGaps).toContain('Water');     // nothing hits Water SE
     });
-    it('ignores status moves (power null) for offense', () => {
-        const team = [mon({ moves: [{ displayName: 'Protect', type: 'normal', power: null }] })];
+    it('ignores status moves for offense', () => {
+        const team = [mon({ moves: [{ displayName: 'Protect', type: 'normal', power: null, damageClass: 'status' }] })];
         expect(analyzeTeam(team, chart).offensive['Grass'].length).toBe(0);
+    });
+    it('counts a variable-power damaging move (null power, e.g. Low Kick) as coverage', () => {
+        // Low Kick is Fighting, physical, but stores null power (weight-based).
+        // It still hits Dark/Steel super-effectively per the chart above.
+        const team = [mon({ moves: [{ displayName: 'Low Kick', type: 'fighting', power: null, damageClass: 'physical' }] })];
+        const a = analyzeTeam(team, chart);
+        expect(a.offensive['Dark'].length).toBe(1);
+        expect(a.offensiveGaps).not.toContain('Dark');
+    });
+    it('Freeze-Dry counts as super-effective Water coverage (move-special)', () => {
+        const team = [mon({ moves: [{ displayName: 'Freeze-Dry', type: 'ice', power: 70 }] })];
+        const a = analyzeTeam(team, chart);
+        expect(a.offensive['Water'].length).toBe(1);
+        expect(a.offensiveGaps).not.toContain('Water');
+    });
+    it('a plain Ice move does NOT cover Water', () => {
+        const team = [mon({ moves: [{ displayName: 'Ice Beam', type: 'ice', power: 90 }] })];
+        expect(analyzeTeam(team, chart).offensive['Water'].length).toBe(0);
     });
 });
 

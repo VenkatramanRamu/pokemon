@@ -38,7 +38,7 @@ function AnalyzerPage() {
             const ability = r.ability ?? p.abilities[0]?.displayName ?? null;
             const moves = [p.type1, p.type2]
                 .filter((t): t is string => Boolean(t))
-                .map((t) => ({ displayName: `${capitalize(t)} (STAB)`, type: t, power: 1 }));
+                .map((t) => ({ displayName: `${capitalize(t)} (STAB)`, type: t, power: 1, damageClass: 'physical' }));
             out.push({
                 id: p.id, slot: i + 1, pokemonId: p.id, displayName: p.displayName,
                 type1: p.type1, type2: p.type2, ability, moves,
