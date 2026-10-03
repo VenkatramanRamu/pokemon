@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getTeamDetail, getTeams, getTypeChart } from '@/modules/api/endpoints';
 import { cloneState, createBattle, resolveTurn, needsReplacement, replacementSlots, benchIndices, applyReplacements, type SideInit } from '@/lib/battle/engine';
 import { chooseCpuTurn } from '@/lib/battle/cpu';
+import { recommendTurn, type MoveRec } from '@/lib/battle/coach';
 import { teamToSide, attachMegaForms } from '@/lib/battle/resolve';
 import { buildMetaTeam } from '@/lib/battle/meta-team';
 import type { Action, BattleEvent, BattlePokemon, BattleState } from '@/lib/battle/types';
@@ -83,6 +84,7 @@ function BattlePage() {
     const [megaSlot, setMegaSlot] = useState<number | null>(null); // player slot declaring Mega this turn
     const [replacePicks, setReplacePicks] = useState<Record<number, number>>({}); // fainted slot -> bench idx
     const [targeting, setTargeting] = useState<{ slot: number; moveIndex: number } | null>(null);
+    const [coachOn, setCoachOn] = useState(false);
     // Animation: play the turn's log events onto `frameRef` before committing `battle`.
     const frameRef = useRef<BattleState | null>(null);
     const nextRef = useRef<BattleState | null>(null);
@@ -359,7 +361,12 @@ function BattlePage() {
         <section className="flex flex-col gap-4 px-6 py-4">
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-bold">Battle · turn {view.turn} · {view.format}{view.weather !== 'none' ? ` · ${view.weather}` : ''}{view.terrain !== 'none' ? ` · ${view.terrain} terrain` : ''}</h1>
-                <Button variant="outline" size="sm" onClick={endBattle}>New battle</Button>
+                <div className="flex items-center gap-2">
+                    <Button variant={coachOn ? 'default' : 'outline'} size="sm" onClick={() => setCoachOn((v) => !v)} title="Show move recommendations for your side">
+                        {coachOn ? '🧠 Coach on' : 'Coach'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={endBattle}>New battle</Button>
+                </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
@@ -421,6 +428,13 @@ function BattlePage() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-3">
+                    {coachOn && recommendTurn(battle, 0).map((recs, slot) => (recs.length === 0 ? null : (
+                        <CoachPanel
+                            key={slot}
+                            recs={recs}
+                            slotLabel={battle.format === 'doubles' ? `Slot ${slot + 1} · ${you.team[you.active[slot]].name}` : undefined}
+                        />
+                    )))}
                     {you.active.map((teamIdx, slot) => (you.team[teamIdx].fainted ? null :
                         <SlotPanel
                             key={slot}
@@ -670,6 +684,27 @@ function BattleLog({ log }: { log: BattleEvent[] }) {
         <div ref={ref} className="max-h-56 overflow-y-auto rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed lg:sticky lg:top-4 lg:max-h-[75vh]">
             <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Battle log</p>
             {lines.length === 0 ? <p className="text-muted-foreground">Waiting for the first move…</p> : lines.map((l, i) => <div key={i} className={cn(!l.startsWith(' ') && 'mt-1 font-semibold')}>{l}</div>)}
+        </div>
+    );
+}
+
+function CoachPanel({ recs, slotLabel }: { recs: MoveRec[]; slotLabel?: string }) {
+    if (recs.length === 0) return null;
+    const best = recs[0];
+    return (
+        <div className="rounded-md border border-primary/50 bg-primary/5 p-3 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">🧠 Coach{slotLabel ? ` · ${slotLabel}` : ''}</span>
+                <span className="font-semibold">{best.label}</span>
+            </div>
+            <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {best.rationale.map((r, i) => <li key={i}>• {r}</li>)}
+            </ul>
+            {recs.length > 1 && (
+                <div className="text-[11px] text-muted-foreground">
+                    then: {recs.slice(1, 4).map((r) => r.label).join(' · ')}
+                </div>
+            )}
         </div>
     );
 }

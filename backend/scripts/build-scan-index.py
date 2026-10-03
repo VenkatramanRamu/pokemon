@@ -17,6 +17,7 @@ from scipy import ndimage
 POK = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REPO = os.path.dirname(POK)
 HOME_DIR = os.path.join(POK, "backend", "public", "sprites", "pokemon", "home")
+PIXEL_DIR = os.path.join(POK, "backend", "public", "sprites", "pokemon")  # base = pixel sprites
 SQLITE = os.path.join(REPO, "pokemon-thor", "public", "champions.sqlite")
 OUT = [
     os.path.join(POK, "frontend", "public", "scan-index.json"),
@@ -86,16 +87,42 @@ def features(path):
     return dhash_hex, [round(float(x), 4) for x in hist]
 
 
-entries = []
-paths = sorted(glob.glob(os.path.join(HOME_DIR, "*.png")), key=lambda p: int(os.path.splitext(os.path.basename(p))[0]))
-for p in paths:
-    pid = int(os.path.splitext(os.path.basename(p))[0])
-    if pid not in pc_ids:
-        continue
-    dh, hist = features(p)
-    entries.append({"id": pid, "name": name_by_id.get(pid), "types": types_by_id.get(pid, []), "dhash": dh, "hist": hist})
+# Ensemble index: each species carries features from BOTH its HOME render (dhash/
+# hist) and its PIXEL sprite (dhashP/histP). The scanner averages the two match
+# distances, which beat either art style alone on the labeled eval set. The game's
+# preview sprite resembles neither exactly, so the consensus is more robust. Forms
+# without a pixel sprite (~40 megas/alts) fall back to the home features.
+from PIL import Image as _PILImage
 
-payload = {"version": 1, "histBins": 24, "hashBits": 64, "entries": entries}
+
+def pixel_or_home(pid):
+    px = os.path.join(PIXEL_DIR, f"{pid}.png")
+    if os.path.exists(px):
+        try:
+            _PILImage.open(px).verify()
+            return px
+        except Exception:
+            pass
+    return os.path.join(HOME_DIR, f"{pid}.png")
+
+
+entries = []
+n_pixel = 0
+for pid in sorted(pc_ids):
+    home_p = os.path.join(HOME_DIR, f"{pid}.png")
+    if not os.path.exists(home_p):
+        continue
+    dh, hist = features(home_p)
+    px_p = pixel_or_home(pid)
+    if px_p != home_p:
+        dhp, histp = features(px_p); n_pixel += 1
+    else:
+        dhp, histp = dh, hist
+    entries.append({"id": pid, "name": name_by_id.get(pid), "types": types_by_id.get(pid, []),
+                    "dhash": dh, "hist": hist, "dhashP": dhp, "histP": histp})
+
+print(f"  (pixel features for {n_pixel}/{len(entries)} species; rest fall back to home)")
+payload = {"version": 2, "histBins": 24, "hashBits": 64, "entries": entries}
 for out in OUT:
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:

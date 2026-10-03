@@ -13,6 +13,7 @@
 import { computeDamage, moveEffectiveness } from '../damage-calc';
 import { activeOf, cloneState, effectiveSpeed, legalActions, resolveTurn, stageMultiplier } from './engine';
 import { BattleRng } from './rng';
+import { extractFeatures, linearValue } from './learn/features';
 import type { Action, BattlePokemon, BattleState, BoostKey, EngineMove } from './types';
 import type { TypeChart } from '../team-analysis';
 
@@ -144,10 +145,19 @@ export function chooseCpuActionForSlot(state: BattleState, sideIndex: 0 | 1, slo
 
 // Position value from `meSide`'s view. Higher is better: healthy live team,
 // opponent statused/chipped, own boosts. Terminal wins dominate.
-export function evaluate(state: BattleState, meSide: 0 | 1): number {
+// Learned value weights (parallel to FEATURE_NAMES + bias), set once at app init
+// from the bundled cpu-value.json. When present, evaluate() uses the learned linear
+// value instead of the hand-tuned heuristic. Null = use the heuristic.
+let valueWeights: number[] | null = null;
+export function setValueWeights(w: number[] | null): void { valueWeights = w; }
+export function getValueWeights(): number[] | null { return valueWeights; }
+
+export function evaluate(state: BattleState, meSide: 0 | 1, weights?: number[] | null): number {
     const opp = (meSide ^ 1) as 0 | 1;
     if (state.winner === meSide) return 1000;
     if (state.winner === opp) return -1000;
+    const w = weights === undefined ? valueWeights : weights;
+    if (w) return linearValue(extractFeatures(state, meSide), w);
     const teamHp = (side: 0 | 1) => state.sides[side].team.reduce((s, m) => s + (m.fainted ? 0 : 0.3 + 0.7 * (m.hp / m.stats.hp)), 0);
     const statusPen = (side: 0 | 1) => state.sides[side].team.reduce((s, m) => s + (!m.fainted && m.status !== 'none' ? 0.12 : 0), 0);
     const boostVal = (side: 0 | 1) => {
@@ -161,8 +171,8 @@ export function evaluate(state: BattleState, meSide: 0 | 1): number {
 // opponent replies greedily, `depth` turns ahead. Future turns are discounted by
 // GAMMA so an advantage NOW beats the same advantage later (KO sooner, not dally).
 const GAMMA = 0.9;
-function searchValue(state: BattleState, meSide: 0 | 1, depth: number, seed: number): number {
-    const here = evaluate(state, meSide);
+function searchValue(state: BattleState, meSide: 0 | 1, depth: number, seed: number, weights?: number[] | null): number {
+    const here = evaluate(state, meSide, weights);
     if (state.winner !== null || depth <= 0) return here;
     const myActs = legalActions(state, meSide, 0);
     if (myActs.length === 0) return here;
@@ -175,7 +185,7 @@ function searchValue(state: BattleState, meSide: 0 | 1, depth: number, seed: num
         const sim = cloneState(state);
         sim.rng = new BattleRng(s);
         resolveTurn(sim, meSide === 0 ? [a, oppAct] : [oppAct, a]);
-        best = Math.max(best, searchValue(sim, meSide, depth - 1, s));
+        best = Math.max(best, searchValue(sim, meSide, depth - 1, s, weights));
     }
     return here + GAMMA * best;
 }
@@ -183,9 +193,10 @@ function searchValue(state: BattleState, meSide: 0 | 1, depth: number, seed: num
 // Singles: score each legal action by simulating the turn against the opponent's
 // modelled (greedy) reply, averaged over `sims` shared RNG scenarios (common
 // random numbers), then continuing the search `depth-1` turns. Pick the best.
-export function chooseSmartAction(state: BattleState, sideIndex: 0 | 1, opts: { sims?: number; depth?: number } = {}): Action {
+export function chooseSmartAction(state: BattleState, sideIndex: 0 | 1, opts: { sims?: number; depth?: number; weights?: number[] | null } = {}): Action {
     const sims = opts.sims ?? 6;
     const depth = opts.depth ?? 1;
+    const weights = opts.weights;
     const candidates = legalActions(state, sideIndex, 0);
     if (candidates.length <= 1) return candidates[0] ?? chooseCpuAction(state, sideIndex);
     const oppSide = (sideIndex ^ 1) as 0 | 1;
@@ -199,7 +210,7 @@ export function chooseSmartAction(state: BattleState, sideIndex: 0 | 1, opts: { 
             const sim = cloneState(state);
             sim.rng = new BattleRng(base + i);            // same scenario across all actions
             resolveTurn(sim, sideIndex === 0 ? [a, oppAct] : [oppAct, a]);
-            total += depth > 1 ? searchValue(sim, sideIndex, depth - 1, base + i * 7919) : evaluate(sim, sideIndex);
+            total += depth > 1 ? searchValue(sim, sideIndex, depth - 1, base + i * 7919, weights) : evaluate(sim, sideIndex, weights);
         }
         const avg = total / sims;
         if (avg > best.score) best = { action: a, score: avg };

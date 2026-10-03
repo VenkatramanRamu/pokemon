@@ -10,19 +10,25 @@ export interface ScanEntry {
     id: number;
     name: string;
     types: string[];
-    dhash: string; // 16 hex chars (64-bit)
-    hist: number[];
+    dhash: string;   // HOME render dHash (16 hex chars = 64-bit)
+    hist: number[];  // HOME render colour histogram
+    dhashP?: string; // PIXEL sprite dHash (ensemble index v2; falls back to home)
+    histP?: number[]; // PIXEL sprite colour histogram
 }
 export interface ScanIndex {
     version: number;
     histBins: number;
     hashBits: number;
-    entries: (Omit<ScanEntry, never> & { _h?: bigint })[];
+    entries: (Omit<ScanEntry, never> & { _h?: bigint; _hP?: bigint })[];
 }
 
 // Parse the raw JSON into a ready-to-query index (precomputes each dHash bigint).
+// v2 carries a second (pixel) feature set; v1 indexes reuse home for both.
 export function hydrateIndex(raw: ScanIndex): ScanIndex {
-    for (const e of raw.entries) e._h = BigInt('0x' + e.dhash);
+    for (const e of raw.entries) {
+        e._h = BigInt('0x' + e.dhash);
+        e._hP = BigInt('0x' + (e.dhashP ?? e.dhash));
+    }
     return raw;
 }
 
@@ -70,8 +76,15 @@ export function rankCandidates(
 ): Candidate[] {
     const want = types.map((t) => t.toLowerCase()).filter(Boolean);
     const all = index.entries.filter((e) => !isMegaName(e.name)).map((e) => {
-        const shape = Math.min(hamming(tile.dhash, e._h!), hamming(tile.dhashMirror, e._h!));
-        const color = histDistance(tile.hist, e.hist);
+        // Ensemble: match the game crop against BOTH the HOME and PIXEL feature sets
+        // and average the distances. The game's preview art resembles neither exactly,
+        // so the consensus is more robust than either alone (validated on the eval set).
+        const shapeH = Math.min(hamming(tile.dhash, e._h!), hamming(tile.dhashMirror, e._h!));
+        const shapeP = Math.min(hamming(tile.dhash, e._hP!), hamming(tile.dhashMirror, e._hP!));
+        const colorH = histDistance(tile.hist, e.hist);
+        const colorP = histDistance(tile.hist, e.histP ?? e.hist);
+        const color = (colorH + colorP) / 2;
+        const shape = (shapeH + shapeP) / 2;
         const matches = want.filter((t) => e.types.some((et) => et.toLowerCase() === t)).length;
         return { id: e.id, name: e.name, types: e.types, colorDist: color, shapeDist: shape, typeMatches: matches };
     });
