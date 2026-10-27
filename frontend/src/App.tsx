@@ -83,6 +83,12 @@ function App() {
                             Coach
                         </Link>
                         <Link
+                            to="/history"
+                            className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
+                        >
+                            History
+                        </Link>
+                        <Link
                             to="/matchups"
                             className="text-muted-foreground hover:text-foreground [&.active]:text-foreground [&.active]:font-medium"
                         >

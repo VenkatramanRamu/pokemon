@@ -5,6 +5,8 @@ import { getTeamDetail, getTeams, getTypeChart } from '@/modules/api/endpoints';
 import { cloneState, createBattle, resolveTurn, needsReplacement, replacementSlots, benchIndices, applyReplacements, type SideInit } from '@/lib/battle/engine';
 import { chooseCpuTurn } from '@/lib/battle/cpu';
 import { recommendTurn, type MoveRec } from '@/lib/battle/coach';
+import { LiveLogger } from '@/lib/battle/log/record';
+import { saveLog } from '@/lib/battle/log/store';
 import { teamToSide, attachMegaForms } from '@/lib/battle/resolve';
 import { buildMetaTeam } from '@/lib/battle/meta-team';
 import type { Action, BattleEvent, BattlePokemon, BattleState } from '@/lib/battle/types';
@@ -85,6 +87,10 @@ function BattlePage() {
     const [replacePicks, setReplacePicks] = useState<Record<number, number>>({}); // fainted slot -> bench idx
     const [targeting, setTargeting] = useState<{ slot: number; moveIndex: number } | null>(null);
     const [coachOn, setCoachOn] = useState(false);
+    // Records the match into a BattleLog as it's played; saved to local history when over.
+    const loggerRef = useRef<LiveLogger | null>(null);
+    const savedRef = useRef(false);
+    const labelRef = useRef('');
     // Animation: play the turn's log events onto `frameRef` before committing `battle`.
     const frameRef = useRef<BattleState | null>(null);
     const nextRef = useRef<BattleState | null>(null);
@@ -155,6 +161,9 @@ function BattlePage() {
         const foeSide: SideInit = { ...preSides.foe, team: foeBring };
         const cpuLeads = leadNeed === 2 ? [0, 1] : [0];
         const s = createBattle(yourSide, foeSide, typeChart, preSides.seed, format, [leadPicks, cpuLeads]);
+        loggerRef.current = new LiveLogger(s, preSides.seed);
+        savedRef.current = false;
+        labelRef.current = `${preSides.your.name} vs ${preSides.foe.name}`;
         setBattle(s);
         setPreSides(null);
         setBringPicks([]);
@@ -232,9 +241,19 @@ function BattlePage() {
         const preLen = next.log.length;
         const playerChoices = pending.map((a, i) => (a && a.kind === 'move' && i === megaSlot ? { ...a, mega: true } : a));
         resolveTurn(next, [playerChoices, cpu]);
-        animateTurn(battle, next, next.log.slice(preLen));
+        const events = next.log.slice(preLen);
+        loggerRef.current?.record(battle, playerChoices, cpu, events);
+        animateTurn(battle, next, events);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pending, battle, animating]);
+
+    // Save the finished match to local battle history (once, when a winner is set).
+    useEffect(() => {
+        if (battle && battle.winner !== null && loggerRef.current && !savedRef.current) {
+            savedRef.current = true;
+            saveLog(loggerRef.current.finish(battle), labelRef.current);
+        }
+    }, [battle]);
 
     const choose = (slot: number, action: Action) => {
         setTargeting(null);

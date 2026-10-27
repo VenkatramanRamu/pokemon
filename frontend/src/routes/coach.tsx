@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
@@ -6,10 +6,12 @@ import {
     getMetaTarget, getPokemonDetail, getTeamDetail, getTeams, getTypeChart,
 } from '@/modules/api/endpoints';
 import {
-    createBattle, resolveTurn, legalActions, needsReplacement, replacementSlots, benchIndices, applyReplacements, type SideInit,
+    cloneState, createBattle, resolveTurn, legalActions, needsReplacement, replacementSlots, benchIndices, applyReplacements, type SideInit,
 } from '@/lib/battle/engine';
 import { teamToSide, attachMegaForms, metaMonToBattlePokemon } from '@/lib/battle/resolve';
 import { recommendTurn, type MoveRec } from '@/lib/battle/coach';
+import { LiveLogger } from '@/lib/battle/log/record';
+import { saveLog } from '@/lib/battle/log/store';
 import { FormatToggle, useCalcMode } from '@/components/damage-calc/format-toggle';
 import type { Action, BattlePokemon, BattleState } from '@/lib/battle/types';
 import { PokemonPicker } from '@/components/pickers/pokemon-picker';
@@ -117,14 +119,18 @@ function CoachPage() {
         );
     }
 
-    return <CoachBattle battle={battle} onReset={() => setBattle(null)} />;
+    return <CoachBattle battle={battle} label={yourTeam?.name} onReset={() => setBattle(null)} />;
 }
 
-function CoachBattle({ battle, onReset }: { battle: BattleState; onReset: () => void }) {
+function CoachBattle({ battle, label, onReset }: { battle: BattleState; label?: string; onReset: () => void }) {
     const [, force] = useState(0);
     const [yourActs, setYourActs] = useState<(Action | null)[]>([]);
     const [oppActs, setOppActs] = useState<(Action | null)[]>([]);
     const refresh = () => { setYourActs([]); setOppActs([]); force((n) => n + 1); };
+    // Record the coached match (both sides' chosen actions) into local history.
+    const loggerRef = useRef<LiveLogger | null>(null);
+    if (!loggerRef.current) loggerRef.current = new LiveLogger(battle);
+    const savedRef = useRef(false);
 
     const over = battle.winner !== null;
     const replace = !over && needsReplacement(battle);
@@ -137,10 +143,21 @@ function CoachBattle({ battle, onReset }: { battle: BattleState; onReset: () => 
 
     const oppReady = oppActive.every((idx, slot) => battle.sides[1].team[idx].fainted || oppActs[slot]);
 
+    // Persist the finished coached match to local battle history (once).
+    useEffect(() => {
+        if (over && loggerRef.current && !savedRef.current) {
+            savedRef.current = true;
+            saveLog(loggerRef.current.finish(battle), label);
+        }
+    }, [over, battle, label]);
+
     const resolve = () => {
         const ya = youActive.map((idx, slot) => (battle.sides[0].team[idx].fainted ? null : (yourActs[slot] ?? recs[slot]?.[0]?.action ?? legalActions(battle, 0, slot)[0] ?? null)));
         const oa = oppActive.map((idx, slot) => (battle.sides[1].team[idx].fainted ? null : (oppActs[slot] ?? legalActions(battle, 1, slot)[0] ?? null)));
+        const before = cloneState(battle);          // battle resolves in place — snapshot first
+        const preLen = battle.log.length;
         resolveTurn(battle, [ya, oa]);
+        loggerRef.current?.record(before, ya, oa, battle.log.slice(preLen));
         refresh();
     };
     const doReplace = () => {

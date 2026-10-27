@@ -5,7 +5,7 @@
 
 import { createBattle, resolveTurn } from '../engine';
 import type { Action, BattlePokemon, BattleEvent, BattleSide, BattleState } from '../types';
-import type { BattleLog, LogAction, LogEvent, LogMon, LogMonState, LogSide, LogSideState, StateSnapshot, LogTurn } from './types';
+import type { BattleLog, LogAction, LogEvent, LogFormat, LogMon, LogMonState, LogSide, LogSideState, StateSnapshot, LogTurn } from './types';
 
 type TypeChart = BattleState['typeChart'];
 type Chooser = (state: BattleState, side: 0 | 1) => Action;
@@ -99,4 +99,45 @@ export function recordGame(
     }
     const winner: LogSide | null = state.winner === 0 ? 'you' : state.winner === 1 ? 'opp' : null;
     return { version: 1, format: 'singles', teams, turns, winner, source: 'engine', seed };
+}
+
+// Incrementally records an INTERACTIVE battle (the Battle screen, the Coach) into a
+// BattleLog — the human drives the turns, we capture each (state -> action) pair the
+// same way recordGame() does for self-play. Singles AND doubles (actions are arrays).
+export class LiveLogger {
+    private turns: LogTurn[] = [];
+    readonly teams: BattleLog['teams'];
+    readonly format: LogFormat;
+    private readonly seed?: number;
+
+    constructor(state: BattleState, seed?: number) {
+        this.teams = teamsFromState(state);
+        this.format = state.format;
+        this.seed = seed;
+    }
+
+    // Record one resolved turn. `stateBefore` MUST be the pre-resolve state (clone it
+    // first if the caller resolves in place); `events` are the log entries this turn
+    // produced (state.log.slice(preLen)). Action arrays are slot-indexed (nulls OK).
+    record(stateBefore: BattleState, youActs: (Action | null)[], oppActs: (Action | null)[], events: BattleEvent[]): void {
+        this.turns.push({
+            snapshot: snapshotState(stateBefore),
+            actions: {
+                you: youActs.map((a, slot) => actionToLog(stateBefore, 0, slot, a)),
+                opp: oppActs.map((a, slot) => actionToLog(stateBefore, 1, slot, a)),
+            },
+            events: events.map(eventToLog).filter((e): e is LogEvent => e !== null),
+        });
+    }
+
+    get turnCount(): number {
+        return this.turns.length;
+    }
+
+    // Seal into a BattleLog using the final state's winner. `source` defaults to the
+    // interactive 'live' tag (pass 'engine' for recorded self-play).
+    finish(state: BattleState, source: BattleLog['source'] = 'live'): BattleLog {
+        const winner: LogSide | null = state.winner === 0 ? 'you' : state.winner === 1 ? 'opp' : null;
+        return { version: 1, format: this.format, teams: this.teams, turns: this.turns, winner, source, seed: this.seed };
+    }
 }
